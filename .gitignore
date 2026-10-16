@@ -9,3 +9,4 @@ __pycache__/
 *.pfx
 data/
 *.dpapi
+*.pre-system.ps1

@@ -4,6 +4,8 @@ Windows PC上のFastAPI/Uvicornから、設定した6室の予定を会議室別
 
 ## 1. 起動とモード切替
 
+**Windows起動時・ログオン不要で運用する場合：** [SYSTEMタスク登録とSecret保存手順](WINDOWS_STARTUP.md) を参照してください。以下の直接起動は開発・手動確認用です。通常運用では `Start-ScheduledTask -TaskName 'Meeting Room Display'` を使用します。
+
 Python 3.11以降を使用し、このフォルダーでPowerShellを開きます。既存の `.venv` はそのまま利用できます。初回のみ `python -m venv .venv` で作成します。
 
 ```powershell
