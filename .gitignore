@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+*.log
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+data/
+*.dpapi

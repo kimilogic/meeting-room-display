@@ -1,0 +1,31 @@
+DATA_SOURCE = "graph"
+
+[[rooms]]
+id = "idoutai"
+name = "移動体本部 ミーティングルーム"
+upn = "idoutai_meeting_room@araidenki7000.onmicrosoft.com"
+
+[[rooms]]
+id = "bc-first"
+name = "ビジネスセンター第1会議室"
+upn = "BC_First_meeting_room@araidenki7000.onmicrosoft.com"
+
+[[rooms]]
+id = "bc-second"
+name = "ビジネスセンター第2会議室"
+upn = "BC_Second_meeting_room@araidenki7000.onmicrosoft.com"
+
+[[rooms]]
+id = "ds-asagaya"
+name = "DS阿佐ヶ谷 会議室1"
+upn = "dsasa_meeting_room@araidenki7000.onmicrosoft.com"
+
+[[rooms]]
+id = "ds-tachikawa-1"
+name = "DS立川北 第1会議室"
+upn = "dsta_meeting_room@araidenki7000.onmicrosoft.com"
+
+[[rooms]]
+id = "ds-tachikawa-2"
+name = "DS立川北 第2会議室"
+upn = "dsta_meeting_room2@araidenki7000.onmicrosoft.com"

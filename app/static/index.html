@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="会議室">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <title>会議室スケジュール</title>
+  <link rel="stylesheet" href="/static/style.css?v=adhoc1">
+</head>
+<body>
+  <main class="screen">
+    <header class="header">
+      <div><p class="eyebrow">ROOM SCHEDULE <span id="source-label" class="demo">接続確認中</span></p><h1 id="room-name">会議室スケジュール</h1></div>
+      <div class="clock-area"><div id="clock" class="clock">--:--:--</div><div id="date">時刻を取得中</div></div>
+    </header>
+    <section id="status-panel" class="status-panel loading" aria-live="polite">
+      <p class="status-caption">予定表上の利用状況</p>
+      <h2 id="status-text">取得中</h2>
+      <p id="status-detail">サーバに接続しています</p>
+      <!-- AD_HOC_CONTROLS -->
+    </section>
+    <div id="connection" class="connection" role="status">表示データを取得しています</div>
+    <section class="cards">
+      <div class="card"><h3>現在の予定</h3><p id="current-time" class="event-time">—</p><p id="current-title" class="event-title">取得中</p><p id="current-organizer" class="event-organizer">予約者：－</p></div>
+      <div class="card next-card"><h3>次の予定</h3><p id="next-time" class="event-time">—</p><p id="next-title" class="event-title">取得中</p><p id="next-organizer" class="event-organizer">予約者：－</p></div>
+    </section>
+    <section class="agenda"><h3>本日の予定</h3><ul id="events"><li>予定を取得しています</li></ul></section>
+    <footer><span id="updated">最終更新 —</span><span>15秒ごとに自動更新 · 日本時間</span></footer>
+    <noscript>JavaScriptを有効にすると予定を表示できます。</noscript>
+  </main>
+  <script src="/static/app.js?v=adhoc1"></script>
+</body>
+</html>
