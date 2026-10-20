@@ -14,13 +14,13 @@
     var boundaryTimer = null;
 
     function updateControls() {
-        if (roomId !== "idoutai") { return; }
         var panel = byId("ad-hoc-controls");
         var start = byId("ad-hoc-start");
         var stop = byId("ad-hoc-stop");
         if (!panel || !start || !stop) { return; }
         var active = lastData && lastData.ad_hoc_active === true;
-        var free = lastData && lastData.status === "free" && lastData.is_demo === false;
+        var free = connectionOk && lastData && lastData.status === "free" &&
+            lastData.is_demo === false && lastData.ad_hoc_can_start === true;
         panel.style.display = active || free ? "block" : "none";
         start.style.display = free && !active ? "inline-block" : "none";
         stop.style.display = active ? "inline-block" : "none";
@@ -69,7 +69,7 @@
         lastData = data;
         connectionOk = true;
         window.clearTimeout(boundaryTimer);
-        if (roomId === "idoutai" && data.ad_hoc_active && typeof data.ad_hoc_next_reservation_ms === "number") {
+        if (data.ad_hoc_active && typeof data.ad_hoc_next_reservation_ms === "number") {
             boundaryTimer = window.setTimeout(retrieve, Math.min(86400000, Math.max(50, data.ad_hoc_next_reservation_ms - data.server_epoch_ms + 50)));
         }
         var list = document.createDocumentFragment();
@@ -129,7 +129,7 @@
         updateControls();
         byId("connection").className = "connection failed";
         put("connection", lastSuccess ? "通信失敗 · 状態・予定は前回取得時点の内容です。自動再試行します。" : "通信失敗 · 予定を取得できません。自動再試行します。");
-        if (roomId === "idoutai" && lastData && lastData.ad_hoc_active) {
+        if (lastData && lastData.ad_hoc_active) {
             put("status-text", "状態未確認");
             put("status-detail", "通信を確認しています（臨時使用の記録あり）");
             byId("status-panel").className = "status-panel unknown";
@@ -141,7 +141,6 @@
     }
     function retrieve(action) {
         if (action !== "start" && action !== "stop") { action = null; }
-        if (action && roomId !== "idoutai") { return; }
         if (inFlight) { return; }
         window.clearTimeout(pollTimer);
         inFlight = true;
@@ -177,16 +176,14 @@
         };
         xhr.onerror = function () { finish(false); };
         try {
-            xhr.open(action ? "POST" : "GET", action ? "/api/room/idoutai/ad-hoc/" + action : apiUrl + "?_=" + started, true);
+            xhr.open(action ? "POST" : "GET", action ? "/api/room/" + encodeURIComponent(roomId) + "/ad-hoc/" + action : apiUrl + "?_=" + started, true);
             if (action) { xhr.setRequestHeader("X-Room-Action", "1"); }
             xhr.send(null);
         } catch (error) { finish(false); }
     }
     window.setInterval(tick, 1000);
-    if (roomId === "idoutai") {
-        if (byId("ad-hoc-start")) { byId("ad-hoc-start").onclick = function () { retrieve("start"); }; }
-        if (byId("ad-hoc-stop")) { byId("ad-hoc-stop").onclick = function () { retrieve("stop"); }; }
-    }
+    if (byId("ad-hoc-start")) { byId("ad-hoc-start").onclick = function () { retrieve("start"); }; }
+    if (byId("ad-hoc-stop")) { byId("ad-hoc-stop").onclick = function () { retrieve("stop"); }; }
     window.addEventListener("pageshow", retrieve, false);
     window.addEventListener("online", retrieve, false);
     document.addEventListener("visibilitychange", function () {

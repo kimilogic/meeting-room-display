@@ -24,8 +24,8 @@ function harness(pathname = '/') {
         assert.equal(async, true);
         const room = pathname.indexOf('/room/') === 0 ? pathname.split('/')[2] : 'idoutai';
         if (method === 'POST') {
-            assert.equal(room, 'idoutai');
-            assert.match(url, /^\/api\/room\/idoutai\/ad-hoc\/(start|stop)$/);
+            assert.ok(url === '/api/room/' + room + '/ad-hoc/start' ||
+                url === '/api/room/' + room + '/ad-hoc/stop');
         } else {
             assert.equal(method, 'GET');
             assert.ok(url.indexOf('/api/room/' + room + '/status?_=') === 0);
@@ -148,7 +148,7 @@ assert.equal(adHoc.elements['ad-hoc-start'].disabled, true);
 assert.equal(adHoc.elements.connection.textContent,'開始不可');
 const otherRoom = harness('/room/bc-first');
 otherRoom.requests[0].respond({...good,room_id:'bc-first'});
-assert.equal(otherRoom.elements['ad-hoc-start'], undefined);
+assert.equal(otherRoom.elements['ad-hoc-start'].style.display, 'none');
 const boundary = harness('/room/idoutai');
 boundary.requests[0].respond({...active, ad_hoc_next_reservation_ms:good.server_epoch_ms + 10000});
 boundary.runTimer(10050,10050);
@@ -156,4 +156,28 @@ assert.equal(boundary.requests[1].method,'GET');
 boundary.requests[1].respond({...good, is_demo:false, ad_hoc_active:false, ad_hoc_can_start:false});
 assert.equal(boundary.elements['status-text'].textContent,'使用中');
 assert.equal(boundary.elements['ad-hoc-stop'].style.display,'none');
+for (const room of ['idoutai', 'bc-first', 'bc-second', 'ds-asagaya', 'ds-tachikawa-1', 'ds-tachikawa-2']) {
+    const page = harness('/room/' + room);
+    page.requests[0].respond({...free, room_id:room});
+    assert.equal(page.elements['ad-hoc-start'].style.display, 'inline-block');
+    page.elements['ad-hoc-start'].onclick();
+    page.requests[1].respond({...active, room_id:room});
+    assert.match(page.elements['status-detail'].textContent, /経過 8分/);
+    assert.equal(page.elements['ad-hoc-stop'].style.display, 'inline-block');
+    page.elements['ad-hoc-stop'].onclick();
+    page.requests[2].respond({...free, room_id:room});
+    assert.equal(page.elements['ad-hoc-stop'].style.display, 'none');
+    page.runTimer(14000,15000);
+    page.requests[3].onerror();
+    assert.equal(page.elements['ad-hoc-start'].style.display, 'none');
+    page.runTimer(14000,15000);
+    page.requests[4].respond({...free, room_id:room, status:'unknown', warning:true, ad_hoc_can_start:false});
+    assert.equal(page.elements['ad-hoc-start'].style.display, 'none');
+    page.runTimer(14000,15000);
+    page.requests[5].respond({...active, room_id:room, ad_hoc_next_reservation_ms:good.server_epoch_ms+10000});
+    page.runTimer(10050,10050);
+    page.requests[6].respond({...good, room_id:room, is_demo:false, ad_hoc_active:false, ad_hoc_can_start:false});
+    assert.equal(page.elements['status-text'].textContent, '使用中');
+    assert.equal(page.elements['ad-hoc-stop'].style.display, 'none');
+}
 console.log('PASS: XHR polling, room isolation, ad-hoc POST, double-tap guard, elapsed minutes, failure/recovery and rejected operations.');

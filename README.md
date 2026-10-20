@@ -214,7 +214,7 @@ Node.jsはフロントエンドの模擬テストだけに使用し、アプリ�
 
 検証対象はdummy、予定なし、使用中／次予定、境界、取消、free、非公開、重複、終日／日またぎ、翌日の次予定、Graph模擬応答、ページング、途中失敗の原子的保持、最終更新維持、401再認証、429待機、不正なnextLink、設定不足、APIのHTTP 200応答、XHRの失敗保持／復旧です。
 
-臨時使用対応後はPythonテスト59件（ローカルHTTPを含む）、JavaScript構文確認、XHR/DOM模擬テストが成功しました。実Graph通信は模擬化し、テナントへの再接続は行っていません。移動体本部の状態欄だけに臨時使用ボタンを追加しました。他室の画面構成は維持しています。旧iPadでのタップ操作・ボタン追加後の高さの最終確認は利用者側で実施してください。
+臨時使用は対象6室の状態欄で利用できます。テストでは実Graph通信を模擬化し、テナントへの再接続は行いません。旧iPadでのタップ操作・ボタン追加後の高さの最終確認は利用者側で実施してください。
 
 ## 9. ファイル構成とセキュリティ
 
@@ -223,7 +223,7 @@ app/main.py             起動・終了、画面／API配信
 app/config.py           TOMLと環境変数の読込・検証
 app/graph.py            MSAL認証、読み取り専用Graph取得
 app/store.py            60秒取得、メモリキャッシュ、障害状態
-app/ad_hoc.py           idoutai限定の臨時使用、保存、正式予約との調整
+app/ad_hoc.py           会議室ごとの臨時使用、保存、正式予約との調整
 app/schedule.py         dummy生成、正規化、予定判定
 app/static/             既存HTML / CSS / ES5 JavaScript
 config.toml             全室共通モードとrooms配列（秘密情報なし）
@@ -310,9 +310,9 @@ foreach ($pocRoomId in $pocRoomIds) {
 通常はPython・JavaScript・HTMLの修正やポート追加は不要です。idoutaiは既存URLの接続先として維持してください。
 
 
-## 12. 移動体本部限定の臨時使用
+## 12. 6会議室の臨時使用
 
-`idoutai` の `/` と `/room/idoutai` だけで使用します。Microsoft 365 / desknet'sには一切書き込みません。Application Calendars.Readと現在の認証方式をそのまま使用します。他室のHTMLにはボタンを挿入せず、status JSONにも臨時使用項目を追加しません。
+`idoutai`、`bc-first`、`bc-second`、`ds-asagaya`、`ds-tachikawa-1`、`ds-tachikawa-2` の各 `/room/{room_id}` で使用します。`/` と旧 `/api/display` は引き続きidoutaiを参照します。Microsoft 365 / desknet'sには一切書き込みません。Application Calendars.Readと現在の認証方式をそのまま使用します。設定済みかつ `app/ad_hoc.py` の `ENABLED_ROOM_IDS` にある会議室だけを許可します。今後会議室を設定に追加するだけでは臨時使用は有効になりません。
 
 ### 操作と条件
 
@@ -331,7 +331,7 @@ foreach ($pocRoomId in $pocRoomIds) {
 3. 臨時使用中
 4. 空室
 
-移動体本部ではGraphの更新失敗が分かった時点で「状態未確認」を優先します。臨時使用の記録自体は残り、通信復旧後に再判定します。記録が残っている間は「使用終了」で解除できます（iPadからサーバへの通信も失敗している間は操作不可）。
+各会議室でGraphの更新失敗が分かった時点で「状態未確認」を優先します。「今から使用」はGraph正常・空室・開始許可ありの場合のみ表示し、通信失敗時にも非表示にします。臨時使用の記録自体は残り、通信復旧後に再判定します。記録が残っている間は「使用終了」で解除できます（iPadからサーバへの通信も失敗している間は操作不可）。他室の開始・終了・Graph障害はその部屋の臨時使用に影響しません。
 
 正式予約との衝突はサーバの約1秒間隔の確認と、status/start/stop API処理時に調べます。ブラウザを閉じても、取得済み正式予約の開始時刻を迎えれば臨時使用を解除します。停止・再起動中に開始して既に終了した予約も、取得範囲内で確認できれば臨時使用を復活させません。取消・freeの予定は正式な使用中として扱いません。
 
@@ -340,8 +340,8 @@ foreach ($pocRoomId in $pocRoomIds) {
 ### 専用API
 
 ```text
-POST /api/room/idoutai/ad-hoc/start
-POST /api/room/idoutai/ad-hoc/stop
+POST /api/room/{room_id}/ad-hoc/start
+POST /api/room/{room_id}/ad-hoc/stop
 ```
 
 画面はXMLHttpRequestで `X-Room-Action: 1` ヘッダーを付けます。ブラウザの別オリジンからのフォーム送信を防ぐため、このヘッダーなしは403とし、CORSは有効にしません。既存の社内LANアクセス制限は維持してください。
@@ -349,9 +349,9 @@ POST /api/room/idoutai/ad-hoc/stop
 - 成功：HTTP 200、操作後の表示用JSON
 - 開始条件不成立：HTTP 409、表示用JSONと `operation_error`
 - 保存失敗：HTTP 503、表示用JSONと安全なエラー文言
-- 他室／存在しないID／未対応操作：HTTP 404
+- 許可対象外／存在しないID／未対応操作：HTTP 404
 
-idoutaiのstatus APIと旧 `/api/display` に次を追加しています。他室のstatusレスポンスには追加しません。
+対象6室のstatus APIと旧 `/api/display` に次を追加しています。値は指定会議室の状態のみを返します。
 
 - `ad_hoc_active`：記録があるか
 - `ad_hoc_started_at`：UTCのISO日時、未使用ならnull
@@ -364,7 +364,7 @@ idoutaiのstatus APIと旧 `/api/display` に次を追加しています。他�
 
 ### 保存・再起動
 
-保存先はプロジェクト内の `data/idoutai-ad-hoc.json` です。最初の操作時に作成し、内容は `active`（真偽値）と `started_at`（UTC日時／null）だけです。認証情報・個人情報・予定は保存しません。dataフォルダーはGit除外済みです。
+保存先はプロジェクト内の `data/{room_id}-ad-hoc.json` です。6室で別々のファイル・ロック・状態を使用し、正式予約との衝突もその部屋の予定だけで判定します。既存の `data/idoutai-ad-hoc.json` は同じ形式・同じ場所で読み込むため移行作業は不要です。最初の操作時に作成し、内容は `active`（真偽値）と `started_at`（UTC日時／null）だけです。認証情報・個人情報・予定は保存しません。dataフォルダーのGit除外は維持しています。
 
 一時ファイルへ書き込み、同じフォルダー内で置き換えて保存します。開始・終了は保存成功後に確定します。ただし正式予約による自動解除は、保存失敗でもメモリ上で直ちに解除し正式予約を優先します。保存障害中は警告し、新規開始を禁止します。
 
@@ -372,16 +372,21 @@ idoutaiのstatus APIと旧 `/api/display` に次を追加しています。他�
 
 再起動後も記録は復元しますが、Graphの初回取得までは状態未確認／取得中を優先します。DBは不要です。**1プロセス・1ワーカー**を継続し、複数プロセスで同じ保存ファイルを共有しないでください。
 
-反映手順は、現在のUvicornを起動元のPowerShellでCtrl+C停止し、環境変数を設定済みの同じPowerShellで次を実行します。
+現在のSYSTEMスケジュールタスクでの運用では、管理者PowerShellから既存タスクを停止し、8020の待受がなくなったことを確認してから同じタスクを開始します。起動方式・Secret登録・Graph認証の変更や再登録は不要です。
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8020
+Stop-ScheduledTask -TaskName 'Meeting Room Display'
+Get-NetTCPConnection -LocalPort 8020 -State Listen -ErrorAction SilentlyContinue
+# 待受がなくなったことを確認してから
+Start-ScheduledTask -TaskName 'Meeting Room Display'
 ```
 
 iPadは一度ページを再読み込みしてください。以降、ページ再読み込みだけで臨時使用が解除されることはありません。今回は稼働中のサーバをCodexから停止・再起動していません。
 
 ### 実機確認
 
-空室時の1タップ開始、経過時間、終了、連打、ページ再読み込み、サーバ再起動後の復元、既知の正式予約開始時の自動解除、障害時の開始不可、他室にボタンがないことを確認してください。ボタンを追加した分、低い画面では下部一覧のスクロールが必要になる場合があります。旧iPadの実タップ・描画は未確認です。
+6室それぞれで空室時の1タップ開始、経過時間、終了、連打、ページ再読み込み、サーバ再起動後の復元を確認してください。2室を同時に臨時使用し、一方の終了や正式予約開始で他方が解除されないこと、Graph障害のある部屋では開始ボタンが表示されないことも確認します。iOS 10.3.4で通常のSafariとホーム画面起動を確認してください。ES5相当の記述・XHRを維持し、fetch／Promise／async-awaitは導入していません。ボタンを追加した分、低い画面では下部一覧のスクロールが必要になる場合があります。実機の描画・タップは未確認です。
 
 自動テストは実Graphに接続せず、一時保存ファイルと模擬Graphを使用しています。本番の臨時使用ファイルは変更しません。テスト項目には保存失敗・不正ファイル・複数スレッドの連打・ブラウザアクセスなしの自動解除・時間上限なしも含めています。
+
+6室対応時の確認結果：既存を含むPythonテスト62件、JavaScript構文確認、6室のXHR/DOM模擬テストが成功しました。開始・終了・連打・再起動復元・室間分離・正式予約による対象室のみの解除・一室の保存ファイル破損・Graph異常を検証しています。Codexのサンドボックスでは既定の一時フォルダーでファイル置換が拒否されるため、PythonテストのTEMP/TMPをGit除外済みの `data/test-temp` に設定し、localhostの一時ポートでHTTPテストを実行しました。稼働中の8020番ポートは使用していません。

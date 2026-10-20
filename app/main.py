@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import ConfigError, Settings, load_credentials, load_settings
 from app.graph import GraphClient, MsalTokenProvider
 from app.store import ScheduleStore
-from app.ad_hoc import AdHoc, AdHocError, DEFAULT_PATH
+from app.ad_hoc import AdHoc, AdHocError, DEFAULT_PATH, ENABLED_ROOM_IDS, room_state_path
 
 STATIC = Path(__file__).resolve().parent / "static"
 
@@ -34,14 +34,20 @@ def create_app(settings=None, client=None, clients=None, ad_hoc_path=None):
             stores[room.id] = ScheduleStore(room_settings, graph_client, error)
         application.state.stores = stores
         application.state.store = stores["idoutai"]  # Existing integrations/tests.
-        application.state.ad_hoc = AdHoc(stores["idoutai"], ad_hoc_path)
+        application.state.ad_hocs = {
+            room_id: AdHoc(store, room_state_path(room_id, ad_hoc_path))
+            for room_id, store in stores.items() if room_id in ENABLED_ROOM_IDS
+        }
+        application.state.ad_hoc = application.state.ad_hocs["idoutai"]  # Legacy alias.
         for store in stores.values():
             store.start()
-        application.state.ad_hoc.start_monitor()
+        for state in application.state.ad_hocs.values():
+            state.start_monitor()
         try:
             yield
         finally:
-            application.state.ad_hoc.close()
+            for state in application.state.ad_hocs.values():
+                state.close()
             for store in stores.values():
                 store.stop.set()
             for store in stores.values():
@@ -65,14 +71,15 @@ def create_app(settings=None, client=None, clients=None, ad_hoc_path=None):
     @application.get("/room/{room_id}")
     def room_index(room_id: str):
         get_store(room_id)
-        if room_id == "idoutai":
+        if room_id in application.state.ad_hocs:
             return index()
         return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-store"})
 
     @application.get("/api/room/{room_id}/status")
     def room_status(room_id: str):
         store = get_store(room_id)
-        data = application.state.ad_hoc.display() if room_id == "idoutai" else store.display()
+        state = application.state.ad_hocs.get(room_id)
+        data = state.display() if state is not None else store.display()
         data["room_id"] = room_id
         return JSONResponse(data, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
 
@@ -80,27 +87,31 @@ def create_app(settings=None, client=None, clients=None, ad_hoc_path=None):
     def display():
         return room_status("idoutai")
 
-    def operate(action, request):
+    def operate(room_id, action, request):
+        get_store(room_id)
+        state = application.state.ad_hocs.get(room_id)
+        if state is None:
+            raise HTTPException(status_code=404, detail="この会議室では臨時使用を利用できません")
         # Custom header prevents cross-origin form submissions; no CORS is enabled.
         if request.headers.get("x-room-action") != "1":
             raise HTTPException(status_code=403, detail="操作ヘッダーが必要です")
         code = 200
         try:
-            data = application.state.ad_hoc.operate(action)
+            data = state.operate(action)
         except AdHocError as exc:
             code = exc.status
-            data = application.state.ad_hoc.display()
+            data = state.display()
             data["operation_error"] = str(exc)
-        data["room_id"] = "idoutai"
+        data["room_id"] = room_id
         return JSONResponse(data, status_code=code, headers={"Cache-Control": "no-store"})
 
-    @application.post("/api/room/idoutai/ad-hoc/start")
-    def ad_hoc_start(request: Request):
-        return operate("start", request)
+    @application.post("/api/room/{room_id}/ad-hoc/start")
+    def ad_hoc_start(room_id: str, request: Request):
+        return operate(room_id, "start", request)
 
-    @application.post("/api/room/idoutai/ad-hoc/stop")
-    def ad_hoc_stop(request: Request):
-        return operate("stop", request)
+    @application.post("/api/room/{room_id}/ad-hoc/stop")
+    def ad_hoc_stop(room_id: str, request: Request):
+        return operate(room_id, "stop", request)
 
     return application
 

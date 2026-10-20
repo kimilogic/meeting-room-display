@@ -1,4 +1,4 @@
-"""Local-only, idoutai ad-hoc occupancy. Never writes to Microsoft Graph."""
+"""Independent local-only room occupancy. Never writes to Microsoft Graph."""
 import json
 import os
 import tempfile
@@ -7,6 +7,20 @@ from pathlib import Path
 from threading import Event, RLock, Thread
 
 DEFAULT_PATH = Path(__file__).resolve().parent.parent / "data" / "idoutai-ad-hoc.json"
+ENABLED_ROOM_IDS = frozenset({
+    "idoutai", "bc-first", "bc-second", "ds-asagaya",
+    "ds-tachikawa-1", "ds-tachikawa-2",
+})
+
+
+def room_state_path(room_id, idoutai_path):
+    """Keep the original idoutai file; other rooms use separate sibling files."""
+    if room_id not in ENABLED_ROOM_IDS:
+        raise ValueError("Ad-hoc use is not enabled for this room")
+    if idoutai_path is None:
+        return None
+    base = Path(idoutai_path)
+    return base if room_id == "idoutai" else base.parent / (room_id + "-ad-hoc.json")
 
 
 class AdHocError(Exception):
@@ -138,7 +152,7 @@ class AdHoc:
             while not self.shutdown.wait(1):
                 with self.lock, self.store.lock:
                     self._reconcile(self.store.clock())
-        self.thread = Thread(target=worker, name="idoutai-ad-hoc", daemon=True)
+        self.thread = Thread(target=worker, name="room-ad-hoc", daemon=True)
         self.thread.start()
 
     def close(self):
